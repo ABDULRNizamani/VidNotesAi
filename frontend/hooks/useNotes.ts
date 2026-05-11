@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { parseApiError, ApiErrorType, ApiError } from '@/lib/api/errors';
 import * as Crypto from 'expo-crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '@/supabase';
 
 const GUEST_PDF_IMPORT_KEY = 'guest:pdf_import_used';
 
@@ -53,6 +54,17 @@ export function useNotes(topicId: string) {
           created_at: new Date().toISOString(),
         };
         await saveGuestNote(note);
+      }
+      // Auto-rename topic if it was left as a placeholder
+      if (!isGuest && noteTitle && noteTitle !== 'Untitled Note' && topicId && topicId !== 'skip') {
+        const { data: topic } = await supabase
+          .from('topics')
+          .select('name')
+          .eq('id', topicId)
+          .single();
+        if (topic && (topic.name === 'Untitled Topic' || topic.name === '')) {
+          await supabase.from('topics').update({ name: noteTitle }).eq('id', topicId);
+        }
       }
       setStreamedContent('');
       await fetchNotes();

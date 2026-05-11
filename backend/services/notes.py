@@ -104,6 +104,22 @@ def extract_video_id(url: str) -> str:
     raise HTTPException(status_code=400, detail="Invalid YouTube URL")
 
 
+async def get_youtube_title(video_id: str) -> str:
+    """Fetch video title via oEmbed — no API key needed."""
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://www.youtube.com/oembed",
+                params={"url": f"https://www.youtube.com/watch?v={video_id}", "format": "json"},
+                timeout=8,
+            )
+        if resp.status_code == 200:
+            return resp.json().get("title", "").strip()
+    except Exception:
+        pass
+    return ""
+
+
 async def get_english_transcript(video_id: str) -> str:
     if not SUPADATA_API_KEY:
         raise HTTPException(status_code=503, detail="Transcript service not configured")
@@ -216,7 +232,7 @@ async def generate_notes(
             )
             source_id = new_source.data[0]["id"]
 
-    title = data.title or "Untitled Note"
+    title = data.title or await get_youtube_title(video_id) or "Untitled Note"
     full_content = await generate_notes_chunked(transcript)
 
     if not is_guest and data.topic_id and source_id:

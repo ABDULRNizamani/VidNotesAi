@@ -140,10 +140,10 @@ function SessionsSidebar({
   onClose: () => void
   loading: boolean
 }) {
-  if (!visible) return null
   return (
-    <Pressable style={styles.sidebarOverlay} onPress={onClose}>
-      <Pressable style={styles.sidebar} onPress={() => {}}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <Pressable style={styles.sidebarOverlay} onPress={onClose}>
+        <Pressable style={styles.sidebar} onPress={() => {}}>
         <View style={styles.sidebarHeader}>
           <Text style={styles.sidebarTitle}>Chats</Text>
           <TouchableOpacity style={styles.sidebarNewBtn} onPress={onNew} hitSlop={8}>
@@ -182,7 +182,8 @@ function SessionsSidebar({
           </ScrollView>
         )}
       </Pressable>
-    </Pressable>
+      </Pressable>
+    </Modal>
   )
 }
 

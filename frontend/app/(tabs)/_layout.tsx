@@ -19,7 +19,7 @@ export default function TabLayout() {
       screenOptions={{ headerShown: false, sceneStyle: { paddingBottom: 0 } }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="notes/index" options={{ title: 'Notes' }} />
+      <Tabs.Screen name="notes" options={{ title: 'Notes' }} />
       <Tabs.Screen name="chatbot" options={{ title: 'Chat' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>

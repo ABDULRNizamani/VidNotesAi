@@ -79,7 +79,6 @@ export default function TopicScreen() {
   const { notes, loading, streaming, streamedContent, streamNotes, removeNote, authLoading, refetch } = useNotes(topicId)
   const { extractStatus, extractError, extractText, resetExtract } = usePdf()
 
-  const [selectedNote, setSelectedNote] = useState<Note | null>(null)
   const [noteToDelete, setNoteToDelete] = useState<Note | null>(null)
   const [generateVisible, setGenerateVisible] = useState(false)
   const [pdfStreaming, setPdfStreaming] = useState(false)
@@ -135,23 +134,6 @@ export default function TopicScreen() {
     }
   }
 
-  // ── Note reader ───────────────────────────────────────────────────────────
-  if (selectedNote) {
-    return (
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setSelectedNote(null)} hitSlop={12}>
-            <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>{selectedNote.title || 'Note'}</Text>
-          <ExportPdfButton noteIds={[selectedNote.id]} topicId={topicId} variant="icon" />
-        </View>
-        <ScrollView contentContainerStyle={styles.readerContent} showsVerticalScrollIndicator={false}>
-          <Markdown style={markdownStyles}>{selectedNote.content}</Markdown>
-        </ScrollView>
-      </View>
-    )
-  }
 
   // ── Streaming view (YouTube) ──────────────────────────────────────────────
   if (streaming) {
@@ -250,7 +232,10 @@ export default function TopicScreen() {
           renderItem={({ item }) => (
             <NoteCard
               note={item}
-              onPress={() => setSelectedNote(item)}
+              onPress={() => router.push({
+                pathname: '/(tabs)/notes/[subjectId]/[topicId]/[noteId]' as any,
+                params: { subjectId, topicId, noteId: item.id },
+              })}
               onDelete={() => setNoteToDelete(item)}
             />
           )}
