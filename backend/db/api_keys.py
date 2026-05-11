@@ -12,13 +12,15 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# ── Key pools ─────────────────────────────────────────────────────────────────
+# ── Key pools
 
 GEMINI_KEYS = [
     k for k in [
         os.getenv("GEMINI_API_KEY_1"),
         os.getenv("GEMINI_API_KEY_2"),
         os.getenv("GEMINI_API_KEY_3"),
+        os.getenv("GEMINI_API_KEY_4"),
+        os.getenv("GEMINI_API_KEY_5"),
     ] if k
 ]
 
@@ -35,8 +37,7 @@ if not GEMINI_KEYS:
 if not GROQ_KEYS:
     logger.warning("No Groq API keys found")
 
-# ── Round-robin counters (thread-safe) ────────────────────────────────────────
-
+# ── Round-robin counters (thread-safe) 
 _gemini_cycle = itertools.cycle(range(len(GEMINI_KEYS))) if GEMINI_KEYS else None
 _groq_cycle = itertools.cycle(range(len(GROQ_KEYS))) if GROQ_KEYS else None
 _key_lock = threading.Lock()
@@ -51,18 +52,18 @@ def _next_groq_key() -> Tuple[str, int]:
         idx = next(_groq_cycle)
     return GROQ_KEYS[idx], idx
 
-# ── Error classification ───────────────────────────────────────────────────────
+# ── Error classification
 
 RETRYABLE_ERRORS = ("429", "503", "UNAVAILABLE", "quota", "overloaded", "high demand", "rate limit")
 
 def _is_retryable(error: Exception) -> bool:
     return any(code in str(error) for code in RETRYABLE_ERRORS)
 
-# ── Retry config ───────────────────────────────────────────────────────────────
+# ── Retry config
 
 RETRY_DELAYS = [5, 10, 20]
 
-# ── Core providers ─────────────────────────────────────────────────────────────
+# ── Core providers
 
 def _try_gemini(prompt: str, model: str, image_base64: Optional[str] = None):
     if not GEMINI_KEYS:
@@ -118,8 +119,7 @@ def _try_groq(prompt: Union[str, list], model: str = "llama-3.3-70b-versatile"):
     logger.error(f"All Groq keys exhausted. Last error: {last_error}")
     raise last_error or RuntimeError("All Groq keys exhausted with no error captured")
 
-# ── Public API ─────────────────────────────────────────────────────────────────
-
+# ── Public API 
 def get_gemini_response(
     prompt: str,
     model: str = "gemini-2.5-flash",

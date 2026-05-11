@@ -8,13 +8,11 @@ from fastapi import HTTPException
 from starlette.concurrency import run_in_threadpool
 from db.supabase import client as supabase
 
-NOTES_CHAR_LIMIT = 15_000   # matches CLAUDE.md cap for all AI context
-CHAT_CHAR_LIMIT  = 80_000   # chatbot gets more room — multi-note sessions
+NOTES_CHAR_LIMIT = 15_000   
+CHAT_CHAR_LIMIT  = 80_000   
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # NOTES CONTEXT
-# ─────────────────────────────────────────────────────────────────────────────
 
 async def get_notes_context(
     topic_ids: list[str],
@@ -93,9 +91,8 @@ async def get_topic_notes_context(
     return combined[:char_limit]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # CHAT CONTEXT
-# ─────────────────────────────────────────────────────────────────────────────
 
 async def get_chat_notes_context(
     session_id: str,
@@ -171,9 +168,7 @@ async def get_chat_history(session_id: str) -> list[dict]:
     return [{"role": m["role"], "content": m["content"]} for m in result.data]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # WEEKLY SUMMARY CONTEXT
-# ─────────────────────────────────────────────────────────────────────────────
 
 async def get_weekly_attempts(since_iso: str) -> dict[str, list[dict]]:
     """

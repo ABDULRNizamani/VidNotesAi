@@ -26,7 +26,7 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 MAX_PLAYLIST_VIDEOS = 10
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Helpers
 
 def extract_playlist_id(url: str) -> str:
     parsed = urlparse(url)
@@ -110,7 +110,7 @@ def get_transcript(video_id: str) -> str:
         return ""
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
+# ── Routes
 
 class VideoItem(BaseModel):
     topic_id: str
@@ -164,7 +164,7 @@ async def generate_playlist(
 
     _check_rate_limit(user_id)
 
-    # ── Pre-validate ALL topic ownership before starting any work ─────────────
+    # ── Pre-validate ALL topic ownership before starting any work 
     valid_topic_ids = {v.topic_id for v in data.videos}
     topic_checks = await run_in_threadpool(
         lambda: supabase.table("topics")

@@ -145,7 +145,7 @@ async def extract_pdf_text(
     file: UploadFile = File(...),
     user=Depends(verify_token)
 ):
-    # ── Rate limit: 10 extractions per day ───────────────────────────────────
+    # ── Rate limit: 10 extractions per day
     now = datetime.now(timezone.utc)
     one_day_ago = (now - timedelta(days=1)).isoformat()
 
@@ -183,7 +183,7 @@ async def extract_pdf_text(
 
         full_text = "\n\n".join(pages_text)
 
-        # ── Log after successful extraction ──────────────────────────────────
+        # ── Log after successful extraction
         db.table("pdf_extractions").insert({
             "user_id": user["sub"],
         }).execute()

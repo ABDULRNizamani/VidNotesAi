@@ -37,7 +37,7 @@ app = FastAPI(
     swagger_ui_parameters={"persistAuthorization": True},
 )
 
-# ── CORS ──────────────────────────────────────────────────────────────────────
+# ── CORS
 ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")
@@ -52,7 +52,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Routers ───────────────────────────────────────────────────────────────────
+# ── Routers
 app.include_router(notes_router)
 app.include_router(quiz_router)
 app.include_router(flashcard_router)
