@@ -3,10 +3,13 @@ import { Stack, usePathname, useSegments, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import 'react-native-reanimated';
+import * as SplashScreen from 'expo-splash-screen';
 import { useAuth } from '@/hooks/useAuth';
 import { Colors } from '@/constants/colors';
 import { PostHogProvider, usePostHog } from 'posthog-react-native';
 import { useEffect } from 'react';
+
+SplashScreen.preventAutoHideAsync();
 
 export const unstable_settings = {
   anchor: 'index',
@@ -37,6 +40,7 @@ function RootLayoutInner() {
     <>
       <ScreenTracker />
       <Stack>
+        <Stack.Screen name="index"          options={{ headerShown: false }} />
         <Stack.Screen name="(onboarding)"   options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)"         options={{ headerShown: false }} />
         <Stack.Screen name="auth/login"     options={{ headerShown: false }} />

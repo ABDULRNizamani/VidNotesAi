@@ -1,6 +1,6 @@
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Modal, Pressable } from 'react-native'
 import { useState, useCallback } from 'react'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useSubjects } from '@/hooks/useSubjects'
@@ -20,6 +20,8 @@ export default function NotesScreen() {
   const insets = useSafeAreaInsets()
   const { subjects, loading, error: subjectsError, deleteSubject, refetch } = useSubjects()
   const [search, setSearch] = useState('')
+
+  useFocusEffect(useCallback(() => { refetch() }, [refetch]))
   const [generateVisible, setGenerateVisible] = useState(false)
   const [playlistError, setPlaylistError] = useState<string | null>(null)
   const [deleteTopicMeta, setDeleteTopicMeta] = useState<{
@@ -31,6 +33,13 @@ export default function NotesScreen() {
 
   const [playlistTopics, setPlaylistTopics] = useState<Record<string, Topic[]>>({})
   const [generatingSubjectId, setGeneratingSubjectId] = useState<string | null>(null)
+
+  // Playlist confirm prompt
+  const [playlistConfirmData, setPlaylistConfirmData] = useState<{
+    playlistUrl: string
+    subjectId: string
+    videos: { video_id: string; title: string; topic_id: string }[]
+  } | null>(null)
 
   const filtered = subjects.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase())
@@ -56,6 +65,16 @@ export default function NotesScreen() {
     })
   }
 
+  // Step 1: show confirm prompt
+  const handleGeneratePlaylistRequest = useCallback((
+    playlistUrl: string,
+    subjectId: string,
+    videos: { video_id: string; title: string; topic_id: string }[]
+  ) => {
+    setPlaylistConfirmData({ playlistUrl, subjectId, videos })
+  }, [])
+
+  // Step 2: user confirmed, actually start
   const handleGeneratePlaylist = useCallback(async (
     playlistUrl: string,
     subjectId: string,
@@ -76,6 +95,13 @@ export default function NotesScreen() {
     setGeneratingSubjectId(subjectId)
     await refetch()
 
+    // Safety net — if the XHR connection drops silently the promise may never
+    // resolve or reject, leaving the skeleton loading forever. Clear after 10 min.
+    const safetyTimer = setTimeout(() => {
+      setGeneratingSubjectId(null)
+      setPlaylistError('Still processing — the backend is taking longer than expected. Check back in a few minutes.')
+    }, 10 * 60 * 1000)
+
     try {
       await generatePlaylist(playlistUrl, subjectId, videos, (event: PlaylistEvent) => {
         if (event.type === 'topic_done') {
@@ -93,6 +119,7 @@ export default function NotesScreen() {
             ),
           }))
         } else if (event.type === 'playlist_done') {
+          clearTimeout(safetyTimer)
           setGeneratingSubjectId(null)
           setTimeout(() => {
             setPlaylistTopics(prev => {
@@ -102,9 +129,15 @@ export default function NotesScreen() {
             })
             refetch()
           }, 3000)
+        } else if (event.type === 'playlist_error') {
+          clearTimeout(safetyTimer)
+          setGeneratingSubjectId(null)
+          setPlaylistError(event.reason ?? 'Playlist generation failed.')
         }
       })
-    } catch (e: unknown) {
+    } catch (e: any) {
+      clearTimeout(safetyTimer)
+      console.error('[playlist] generation error:', e)
       setGeneratingSubjectId(null)
       setPlaylistError(e instanceof Error ? e.message : 'Playlist generation failed.')
     }
@@ -187,8 +220,54 @@ export default function NotesScreen() {
         visible={generateVisible}
         onClose={() => setGenerateVisible(false)}
         onGenerate={handleGenerate}
-        onGeneratePlaylist={handleGeneratePlaylist}
+        onGeneratePlaylist={handleGeneratePlaylistRequest}
       />
+
+      {/* Playlist time estimate prompt */}
+      <Modal
+        visible={!!playlistConfirmData}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPlaylistConfirmData(null)}
+      >
+        <Pressable style={styles.confirmOverlay} onPress={() => setPlaylistConfirmData(null)}>
+          <Pressable style={styles.confirmSheet} onPress={() => {}}>
+            <View style={styles.confirmIconWrap}>
+              <Ionicons name="time-outline" size={32} color={Colors.blue.default} />
+            </View>
+            <Text style={styles.confirmTitle}>This may take a while</Text>
+            <Text style={styles.confirmBody}>
+              Generating notes for {playlistConfirmData?.videos.length ?? 0} video
+              {(playlistConfirmData?.videos.length ?? 0) !== 1 ? 's' : ''} takes roughly{' '}
+              <Text style={styles.confirmBold}>
+                {Math.ceil((playlistConfirmData?.videos.length ?? 0) * 1.5)} minute
+                {Math.ceil((playlistConfirmData?.videos.length ?? 0) * 1.5) !== 1 ? 's' : ''}
+              </Text>
+              .{'\n\n'}Keep the app open or come back later — progress is saved automatically and you'll see it when you return.
+            </Text>
+            <TouchableOpacity
+              style={styles.confirmBtn}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (!playlistConfirmData) return
+                const { playlistUrl, subjectId, videos } = playlistConfirmData
+                setPlaylistConfirmData(null)
+                setTimeout(() => handleGeneratePlaylist(playlistUrl, subjectId, videos), 0)
+              }}
+            >
+              <Ionicons name="sparkles" size={18} color="#fff" />
+              <Text style={styles.confirmBtnText}>Start Generating</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.confirmCancelBtn}
+              onPress={() => setPlaylistConfirmData(null)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.confirmCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <DeleteConfirmModal
         visible={!!deleteTopicMeta}
@@ -238,5 +317,74 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 8,
+  },
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+  },
+  confirmSheet: {
+    backgroundColor: Colors.surface,
+    borderRadius: Layout.borderRadius.xl,
+    padding: Spacing.xl,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+  },
+  confirmIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(74,158,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
+  },
+  confirmTitle: {
+    fontSize: Typography.size.xl,
+    fontFamily: Typography.family.bold,
+    color: Colors.text.primary,
+    marginBottom: Spacing.md,
+    textAlign: 'center',
+  },
+  confirmBody: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.regular,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: Spacing.xl,
+  },
+  confirmBold: {
+    fontFamily: Typography.family.bold,
+    color: Colors.text.primary,
+  },
+  confirmBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.blue.default,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: Layout.borderRadius.full,
+    width: '100%',
+    marginBottom: Spacing.sm,
+  },
+  confirmBtnText: {
+    fontSize: Typography.size.md,
+    fontFamily: Typography.family.semibold,
+    color: '#fff',
+  },
+  confirmCancelBtn: {
+    paddingVertical: Spacing.sm,
+  },
+  confirmCancelText: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.medium,
+    color: Colors.text.muted,
   },
 })

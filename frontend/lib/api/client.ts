@@ -1,7 +1,7 @@
 import { supabase } from '@/supabase';
 import { getOrCreateDeviceId } from '@/services/deviceId';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL!;
+export const BASE_URL = process.env.EXPO_PUBLIC_API_URL!;
 
 let _refreshing: Promise<string | null> | null = null;
 

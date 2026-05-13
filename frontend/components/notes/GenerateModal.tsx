@@ -39,7 +39,6 @@ export function GenerateModal({
   onGenerate,
   onGeneratePlaylist,
   onGeneratePdf,
-  
   prefillUrl = '',
 }: Props) {
   const router = useRouter()
@@ -59,10 +58,8 @@ export function GenerateModal({
   const { topics, createTopic } = useTopics(selectedSubjectId ?? '')
   const { isGuestLimitReached } = useNotes(selectedTopicId ?? '')
 
-  // ── Video tab state ──
   const [url, setUrl] = useState(prefillUrl)
 
-  // ── Playlist tab state ──
   const [playlistUrl, setPlaylistUrl] = useState('')
   const [playlistLoading, setPlaylistLoading] = useState(false)
   const [playlistError, setPlaylistError] = useState('')
@@ -72,7 +69,6 @@ export function GenerateModal({
   const [editedTitles, setEditedTitles] = useState<Record<string, string>>({})
   const [playlistConfirming, setPlaylistConfirming] = useState(false)
 
-  // ── PDF tab state ──
   const [pdfFile, setPdfFile] = useState<{ uri: string; name: string } | null>(null)
   const [pdfConfirmVisible, setPdfConfirmVisible] = useState(false)
   const { extractStatus, extractText, extractError, resetExtract } = usePdf()
@@ -120,19 +116,11 @@ export function GenerateModal({
     setTab(next)
   }
 
-  // ── Subject handlers ──
-  // ── Subject handlers ──
   const handleAddSubject = async () => {
-    console.log('[handleAddSubject] called', { newSubjectName, loading })
-    if (!newSubjectName.trim()) {
-      console.log('[handleAddSubject] BAILED — empty name')
-      return
-    }
+    if (!newSubjectName.trim()) return
     const trimmed = newSubjectName.trim()
     const exists = subjects.find(s => s.name.toLowerCase() === trimmed.toLowerCase())
-    console.log('[handleAddSubject] exists check', { exists: !!exists, subjectsCount: subjects.length })
     if (exists) {
-      console.log('[handleAddSubject] subject already exists, selecting', exists.id)
       setSelectedSubjectId(exists.id)
       setSelectedTopicId(null)
       setNewSubjectName('')
@@ -142,23 +130,19 @@ export function GenerateModal({
     }
     setLoading(true)
     try {
-      console.log('[handleAddSubject] calling createSubject', trimmed)
       const s = await createSubject(trimmed)
-      console.log('[handleAddSubject] subject created', s)
       setSelectedSubjectId(s.id)
       setSelectedTopicId(null)
       setNewSubjectName('')
       setAddingSubject(false)
       setValidationMsg('')
     } catch (e: any) {
-      console.log('[handleAddSubject] ERROR', e.message)
       setValidationMsg(e.message ?? 'Failed to create subject')
     } finally {
       setLoading(false)
     }
   }
 
-  // ── Topic handlers ──
   const handleAddTopic = async () => {
     if (!newTopicName.trim() || !selectedSubjectId) return
     const trimmed = newTopicName.trim()
@@ -182,7 +166,6 @@ export function GenerateModal({
     }
   }
 
-  // ── Video generate ──
   const handleGenerate = () => {
     if (!url.trim()) { setValidationMsg('Please paste a YouTube URL first.'); return }
     if (!selectedSubjectId) { setValidationMsg('Please select or create a subject.'); return }
@@ -192,7 +175,6 @@ export function GenerateModal({
     handleClose()
   }
 
-  // ── Playlist fetch ──
   const handleFetchPlaylist = async () => {
     if (!playlistUrl.trim()) { setPlaylistError('Paste a YouTube playlist URL first.'); return }
     setPlaylistLoading(true)
@@ -213,7 +195,6 @@ export function GenerateModal({
     }
   }
 
-  // ── Playlist generate ──
   const handleGeneratePlaylist = async () => {
     if (!playlistUrl.trim()) { setValidationMsg('Please paste a YouTube playlist URL first.'); return }
     if (playlistVideos.length === 0) { setValidationMsg('Preview the playlist before generating.'); return }
@@ -225,6 +206,7 @@ export function GenerateModal({
       for (const video of playlistVideos) {
         const topicName = editedTitles[video.video_id] || video.title
         const topic = await createTopic(topicName, undefined, 'pending')
+        if (!topic?.id) throw new Error('Failed to create topic: ' + topicName)
         videosWithTopics.push({ video_id: video.video_id, title: topicName, topic_id: topic.id })
       }
       onGeneratePlaylist?.(playlistUrl.trim(), selectedSubjectId, videosWithTopics)
@@ -236,7 +218,6 @@ export function GenerateModal({
     }
   }
 
-  // ── PDF pick ──
   const handlePickPdf = async () => {
     resetExtract()
     const result = await DocumentPicker.getDocumentAsync({
@@ -248,14 +229,13 @@ export function GenerateModal({
     setPdfFile({ uri: file.uri, name: file.name ?? 'document.pdf' })
   }
 
-  // ── PDF generate ──
   const handleGeneratePdf = async () => {
     if (!pdfFile) { setValidationMsg('Please pick a PDF file first.'); return }
     if (!selectedSubjectId) { setValidationMsg('Please select or create a subject.'); return }
     if (!selectedTopicId) { setValidationMsg('Please select or create a topic.'); return }
     setValidationMsg('')
     const res = await extractText(pdfFile.uri)
-    if (!res) return // extractError will show via extractStatus
+    if (!res) return
     onGeneratePdf?.(res.text, res.pages, selectedSubjectId, selectedTopicId)
     handleClose()
   }
@@ -264,7 +244,6 @@ export function GenerateModal({
 
   const subjectTopicSection = (showTopic: boolean) => (
     <>
-      {/* Subject */}
       <Text style={styles.label}>Subject</Text>
       <ScrollView
         horizontal
@@ -316,7 +295,6 @@ export function GenerateModal({
         </View>
       )}
 
-      {/* Topic */}
       {showTopic && (
         <>
           <Text style={styles.label}>Topic</Text>
@@ -384,7 +362,6 @@ export function GenerateModal({
           <Pressable style={styles.sheet} onPress={() => {}}>
             <View style={styles.handle} />
 
-            {/* Header */}
             <View style={styles.header}>
               <Text style={styles.title}>Generate Notes</Text>
               <TouchableOpacity onPress={handleClose} hitSlop={12}>
@@ -392,7 +369,6 @@ export function GenerateModal({
               </TouchableOpacity>
             </View>
 
-            {/* Tabs */}
             <View style={styles.tabs}>
               <TouchableOpacity
                 style={[styles.tab, tab === 'video' && styles.tabActive]}
@@ -422,6 +398,7 @@ export function GenerateModal({
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled={true}
               >
                 {tab === 'video' && (
                   <>
@@ -563,7 +540,6 @@ export function GenerateModal({
                   </>
                 )}
 
-                {/* Validation */}
                 {validationMsg.length > 0 && (
                   <View style={styles.validationRow}>
                     <Ionicons name="alert-circle-outline" size={15} color={Colors.red.default} />
@@ -586,14 +562,13 @@ export function GenerateModal({
                   </View>
                 )}
 
-                {/* Generate button */}
                 <TouchableOpacity
                   style={[styles.generateBtn, (isGuestLimitReached || isGenerating) && { opacity: 0.5 }]}
-                  onPress={
-                    tab === 'video' ? handleGenerate :
-                    tab === 'playlist' ? handleGeneratePlaylist :
-                    handleGeneratePdf
-                  }
+                  onPressIn={() => {
+                    if (tab === 'video') handleGenerate()
+                    else if (tab === 'playlist') handleGeneratePlaylist()
+                    else handleGeneratePdf()
+                  }}
                   disabled={isGuestLimitReached || isGenerating}
                   activeOpacity={0.8}
                 >

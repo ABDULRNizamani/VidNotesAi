@@ -4,8 +4,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAuth } from '@/hooks/useAuth';
 
-SplashScreen.preventAutoHideAsync();
-
 const ONBOARDING_KEY = 'vidnotes:onboarding_complete';
 
 export default function Entry() {

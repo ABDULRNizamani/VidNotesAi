@@ -1,13 +1,14 @@
 import os
+import json
 import httpx
 import asyncio
 import logging
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, AsyncGenerator
 from urllib.parse import urlparse, parse_qs
 from starlette.concurrency import run_in_threadpool
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 from db.supabase import client as supabase
 from datetime import datetime, timezone, timedelta
 from dependencies.auth import verify_token
@@ -23,6 +24,7 @@ _active_playlist_users: set[str] = set()
 _active_playlist_lock = asyncio.Lock()
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+SUPADATA_API_KEY = os.getenv("SUPADATA_API_KEY")
 MAX_PLAYLIST_VIDEOS = 10
 
 
@@ -80,33 +82,33 @@ async def fetch_playlist_info(playlist_id: str) -> dict:
     }
 
 
-def get_transcript(video_id: str) -> str:
-    try:
-        ytt = YouTubeTranscriptApi()
-        transcript_list = ytt.list(video_id)
-    except (TranscriptsDisabled, NoTranscriptFound):
+async def get_transcript(video_id: str) -> str:
+    """Fetch transcript via Supadata — same service used by single-video notes."""
+    if not SUPADATA_API_KEY:
+        logger.error("[playlist] SUPADATA_API_KEY not configured")
         return ""
-    except Exception as e:
-        logger.warning(f"[playlist] transcript list failed for {video_id}: {type(e).__name__}: {e}")
-        return ""
-
     try:
-        transcript = transcript_list.find_manually_created_transcript(['en'])
-    except:
-        try:
-            transcript = transcript_list.find_generated_transcript(['en'])
-        except:
-            try:
-                transcript = next(iter(transcript_list))
-                transcript = transcript.translate('en')
-            except:
-                return ""
-
-    try:
-        snippets = transcript.fetch()
-        return " ".join([s.text.replace("\n", " ") for s in snippets])[:18000]
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://api.supadata.ai/v1/youtube/transcript",
+                params={"videoId": video_id, "lang": "en"},
+                headers={"x-api-key": SUPADATA_API_KEY},
+                timeout=30,
+            )
+        if resp.status_code != 200:
+            logger.warning(f"[playlist] Supadata {resp.status_code} for {video_id}")
+            return ""
+        content = resp.json().get("content", [])
+        if not content:
+            logger.warning(f"[playlist] Supadata returned empty content for {video_id}")
+            return ""
+        transcript = " ".join(
+            chunk["text"].replace("\n", " ") for chunk in content if chunk.get("text")
+        )
+        logger.info(f"[playlist] transcript OK for {video_id}: {len(transcript)} chars")
+        return transcript
     except Exception as e:
-        logger.warning(f"[playlist] transcript fetch failed: {type(e).__name__}: {e}")
+        logger.warning(f"[playlist] Supadata request failed for {video_id}: {type(e).__name__}: {e}")
         return ""
 
 
@@ -131,11 +133,17 @@ async def playlist_info(url: str, user=Depends(verify_token)):
     return info
 
 
+def _sse(event: str, data: dict) -> str:
+    """Format a single SSE message."""
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
 @router.post("/generate/playlist")
 async def generate_playlist(
     data: GeneratePlaylistRequest,
     user=Depends(verify_token),
 ):
+    # ── Validate subject ownership ──
     subject = await run_in_threadpool(
         lambda: supabase.table("subjects")
         .select("user_id")
@@ -164,7 +172,7 @@ async def generate_playlist(
 
     _check_rate_limit(user_id)
 
-    # ── Pre-validate ALL topic ownership before starting any work 
+    # ── Pre-validate ALL topic ownership before streaming starts ──
     valid_topic_ids = {v.topic_id for v in data.videos}
     topic_checks = await run_in_threadpool(
         lambda: supabase.table("topics")
@@ -174,7 +182,6 @@ async def generate_playlist(
         .execute()
     )
     valid = {t["id"] for t in topic_checks.data}
-
     invalid = valid_topic_ids - valid
     if invalid:
         async with _active_playlist_lock:
@@ -185,91 +192,111 @@ async def generate_playlist(
         )
 
     playlist_id = extract_playlist_id(data.playlist_url)
-    results = []
 
-    try:
-        async with get_playlist_semaphore():
-            for video in data.videos:
-                topic_id = video.topic_id
-                video_id = video.video_id
-                title = video.title
+    async def event_stream() -> AsyncGenerator[str, None]:
+        try:
+            async with get_playlist_semaphore():
+                for index, video in enumerate(data.videos):
+                    topic_id = video.topic_id
+                    video_id = video.video_id
+                    title = video.title
 
-                await run_in_threadpool(
-                    lambda tid=topic_id: supabase.table("topics")
-                    .update({"generation_status": "generating"})
-                    .eq("id", tid)
-                    .execute()
-                )
-
-                transcript = await run_in_threadpool(get_transcript, video_id)
-
-                if not transcript:
                     await run_in_threadpool(
                         lambda tid=topic_id: supabase.table("topics")
-                        .update({"generation_status": "failed"})
+                        .update({"generation_status": "generating"})
                         .eq("id", tid)
                         .execute()
                     )
-                    results.append({"topic_id": topic_id, "status": "failed", "reason": "No transcript available"})
-                    continue
 
-                existing = await run_in_threadpool(
-                    lambda vid=video_id: supabase.table("sources")
-                    .select("id")
-                    .eq("video_id", vid)
-                    .execute()
-                )
+                    transcript = await get_transcript(video_id)
 
-                if existing.data:
-                    source_id = existing.data[0]["id"]
-                else:
-                    new_source = await run_in_threadpool(
-                        lambda vid=video_id, tr=transcript, tid=topic_id: supabase.table("sources").insert({
-                            "video_url": f"https://www.youtube.com/watch?v={vid}",
-                            "video_id": vid,
-                            "transcript": tr,
+                    if not transcript:
+                        await run_in_threadpool(
+                            lambda tid=topic_id: supabase.table("topics")
+                            .update({"generation_status": "failed"})
+                            .eq("id", tid)
+                            .execute()
+                        )
+                        yield _sse("topic_failed", {
+                            "topic_id": topic_id,
+                            "index": index,
+                            "reason": "No transcript available",
+                        })
+                        continue
+
+                    existing = await run_in_threadpool(
+                        lambda vid=video_id: supabase.table("sources")
+                        .select("id")
+                        .eq("video_id", vid)
+                        .execute()
+                    )
+
+                    if existing.data:
+                        source_id = existing.data[0]["id"]
+                    else:
+                        new_source = await run_in_threadpool(
+                            lambda vid=video_id, tr=transcript, tid=topic_id: supabase.table("sources").insert({
+                                "video_url": f"https://www.youtube.com/watch?v={vid}",
+                                "video_id": vid,
+                                "transcript": tr,
+                                "topic_id": tid,
+                                "playlist_id": playlist_id,
+                                "is_playlist": True,
+                            }).execute()
+                        )
+                        source_id = new_source.data[0]["id"]
+
+                    try:
+                        full_content = await generate_notes_chunked(transcript)
+                    except Exception as e:
+                        logger.error(f"[playlist] AI failed for video {video_id}: {type(e).__name__}: {e}")
+                        await run_in_threadpool(
+                            lambda tid=topic_id: supabase.table("topics")
+                            .update({"generation_status": "failed"})
+                            .eq("id", tid)
+                            .execute()
+                        )
+                        yield _sse("topic_failed", {
+                            "topic_id": topic_id,
+                            "index": index,
+                            "reason": str(e),
+                        })
+                        continue
+
+                    await run_in_threadpool(
+                        lambda tid=topic_id, sid=source_id, t=title, fc=full_content: supabase.table("notes").insert({
                             "topic_id": tid,
-                            "playlist_id": playlist_id,
-                            "is_playlist": True,
+                            "source_id": sid,
+                            "title": t,
+                            "content": fc,
+                            "status": "active",
+                            "expires_at": (datetime.now(timezone.utc) + timedelta(days=25)).isoformat(),
                         }).execute()
                     )
-                    source_id = new_source.data[0]["id"]
 
-                try:
-                    full_content = await generate_notes_chunked(transcript)
-                except Exception as e:
-                    logger.error(f"[playlist] AI failed for video {video_id}: {type(e).__name__}: {e}")
                     await run_in_threadpool(
                         lambda tid=topic_id: supabase.table("topics")
-                        .update({"generation_status": "failed"})
+                        .update({"generation_status": "done"})
                         .eq("id", tid)
                         .execute()
                     )
-                    results.append({"topic_id": topic_id, "status": "failed", "reason": str(e)})
-                    continue
 
-                await run_in_threadpool(
-                    lambda tid=topic_id, sid=source_id, t=title, fc=full_content: supabase.table("notes").insert({
-                        "topic_id": tid,
-                        "source_id": sid,
-                        "title": t,
-                        "content": fc,
-                        "status": "active",
-                        "expires_at": (datetime.now(timezone.utc) + timedelta(days=25)).isoformat(),
-                    }).execute()
-                )
+                    yield _sse("topic_done", {"topic_id": topic_id, "index": index})
 
-                await run_in_threadpool(
-                    lambda tid=topic_id: supabase.table("topics")
-                    .update({"generation_status": "done"})
-                    .eq("id", tid)
-                    .execute()
-                )
+            yield _sse("playlist_done", {})
 
-                results.append({"topic_id": topic_id, "status": "done"})
+        except Exception as e:
+            logger.error(f"[playlist] stream error: {type(e).__name__}: {e}")
+            yield _sse("playlist_error", {"reason": str(e)})
+        finally:
+            async with _active_playlist_lock:
+                _active_playlist_users.discard(user_id)
 
-    finally:
-        async with _active_playlist_lock:
-            _active_playlist_users.discard(user_id)
-
-    return {"results": results}
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disable nginx buffering
+        },
+    )
