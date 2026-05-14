@@ -22,7 +22,6 @@ interface Props {
   onTopicPress: (subjectId: string, topicId: string) => void
   onDeleteTopic: (subjectId: string, topicId: string, topicName: string) => void
   forceExpanded?: boolean
-  // injected topics + setTopicStatus for playlist mode
   overrideTopics?: Topic[]
 }
 
@@ -147,7 +146,6 @@ function TopicRow({
 
   const isPending = topic.generation_status === 'pending'
   const isGenerating = topic.generation_status === 'generating'
-  const isDone = topic.generation_status === 'done'
   const isFailed = topic.generation_status === 'failed'
   const isInProgress = isPending || isGenerating
 
@@ -157,7 +155,7 @@ function TopicRow({
       onPress={onPress}
       activeOpacity={isInProgress ? 1 : 0.8}
     >
-      {/* Left indicator */}
+      {/* Left dot — always blue unless pending/generating/failed */}
       {isGenerating ? (
         <Animated.View style={[styles.topicDot, styles.topicDotGenerating, { opacity: pulseAnim }]} />
       ) : isPending ? (
@@ -165,10 +163,10 @@ function TopicRow({
       ) : isFailed ? (
         <View style={[styles.topicDot, styles.topicDotFailed]} />
       ) : (
-        <View style={[styles.topicDot, isDone && styles.topicDotDone]} />
+        <View style={styles.topicDot} />
       )}
 
-      {/* Name — skeleton shimmer for pending */}
+      {/* Name — skeleton shimmer while pending */}
       {isPending ? (
         <Animated.View style={[styles.skeletonName, { opacity: pulseAnim }]} />
       ) : (
@@ -180,12 +178,9 @@ function TopicRow({
         </Text>
       )}
 
-      {/* Right indicator */}
+      {/* Right side */}
       {isGenerating && (
         <Text style={styles.generatingLabel}>writing...</Text>
-      )}
-      {isDone && (
-        <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
       )}
       {isFailed && (
         <Ionicons name="alert-circle-outline" size={16} color={Colors.error} />
@@ -289,9 +284,6 @@ const styles = StyleSheet.create({
   },
   topicDotPending: {
     backgroundColor: Colors.text.muted,
-  },
-  topicDotDone: {
-    backgroundColor: Colors.success,
   },
   topicDotFailed: {
     backgroundColor: Colors.error,

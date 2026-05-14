@@ -1,9 +1,8 @@
 import {
   View, Text, Modal, StyleSheet, TouchableOpacity, TextInput,
-  Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView,
-  Platform,
+  Pressable, ScrollView, ActivityIndicator, Platform,
 } from 'react-native'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Ionicons } from '@expo/vector-icons'
 import * as DocumentPicker from 'expo-document-picker'
 import { useSubjects } from '@/hooks/useSubjects'
@@ -17,6 +16,8 @@ import { Typography } from '@/constants/typography'
 import { Spacing } from '@/constants/spacing'
 import { Layout } from '@/constants/layout'
 import { useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+
 
 type Tab = 'video' | 'playlist' | 'pdf'
 
@@ -44,6 +45,7 @@ export function GenerateModal({
   const router = useRouter()
   const { isGuest } = useAuth()
   const [tab, setTab] = useState<Tab>('video')
+  const insets = useSafeAreaInsets()
 
   const { subjects, createSubject } = useSubjects()
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null)
@@ -56,7 +58,7 @@ export function GenerateModal({
   const [validationMsg, setValidationMsg] = useState('')
 
   const { topics, createTopic } = useTopics(selectedSubjectId ?? '')
-  const { isGuestLimitReached } = useNotes(selectedTopicId ?? '')
+  const { isGuestLimitReached } = useNotes(selectedTopicId ?? 'none')
 
   const [url, setUrl] = useState(prefillUrl)
 
@@ -70,9 +72,10 @@ export function GenerateModal({
   const [playlistConfirming, setPlaylistConfirming] = useState(false)
 
   const [pdfFile, setPdfFile] = useState<{ uri: string; name: string } | null>(null)
-  const [pdfConfirmVisible, setPdfConfirmVisible] = useState(false)
   const { extractStatus, extractText, extractError, resetExtract } = usePdf()
   const pdfLoading = extractStatus === 'loading'
+
+  const scrollViewRef = useRef<ScrollView>(null)
 
   useEffect(() => {
     if (visible) setUrl(prefillUrl)
@@ -97,7 +100,6 @@ export function GenerateModal({
     setEditedTitles({})
     setPlaylistConfirming(false)
     setPdfFile(null)
-    setPdfConfirmVisible(false)
     resetExtract()
   }
 
@@ -114,6 +116,7 @@ export function GenerateModal({
     setPdfFile(null)
     resetExtract()
     setTab(next)
+    scrollViewRef.current?.scrollTo({ y: 0, animated: false })
   }
 
   const handleAddSubject = async () => {
@@ -144,7 +147,8 @@ export function GenerateModal({
   }
 
   const handleAddTopic = async () => {
-    if (!newTopicName.trim() || !selectedSubjectId) return
+    if (!newTopicName.trim()) return
+    if (!selectedSubjectId) { setValidationMsg('Please select a subject first.'); return }
     const trimmed = newTopicName.trim()
     const exists = topics.find(t => t.name.toLowerCase() === trimmed.toLowerCase())
     if (exists) {
@@ -240,7 +244,9 @@ export function GenerateModal({
     handleClose()
   }
 
-  const isGenerating = playlistConfirming || pdfLoading
+  const isCurrentTabGenerating =
+    (tab === 'playlist' && playlistConfirming) ||
+    (tab === 'pdf' && pdfLoading)
 
   const subjectTopicSection = (showTopic: boolean) => (
     <>
@@ -250,7 +256,7 @@ export function GenerateModal({
         showsHorizontalScrollIndicator={false}
         style={{ marginBottom: Spacing.sm }}
         contentContainerStyle={{ paddingHorizontal: 2 }}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="always"
       >
         <View style={styles.chipRow}>
           {subjects.map(s => (
@@ -285,8 +291,10 @@ export function GenerateModal({
             placeholder="Subject name..."
             placeholderTextColor={Colors.text.muted}
             autoFocus
+            returnKeyType="done"
+            onSubmitEditing={handleAddSubject}
           />
-          <TouchableOpacity style={styles.addBtn} onPressIn={handleAddSubject} disabled={loading}>
+          <TouchableOpacity style={styles.addBtn} onPress={handleAddSubject} disabled={loading}>
             {loading
               ? <ActivityIndicator size="small" color="#fff" />
               : <Ionicons name="checkmark" size={18} color="#fff" />
@@ -295,7 +303,7 @@ export function GenerateModal({
         </View>
       )}
 
-      {showTopic && (
+      {showTopic && selectedSubjectId && (
         <>
           <Text style={styles.label}>Topic</Text>
           <ScrollView
@@ -303,7 +311,7 @@ export function GenerateModal({
             showsHorizontalScrollIndicator={false}
             style={{ marginBottom: Spacing.sm }}
             contentContainerStyle={{ paddingHorizontal: 2 }}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
           >
             <View style={styles.chipRow}>
               {topics.map(t => (
@@ -338,6 +346,8 @@ export function GenerateModal({
                 placeholder="Topic name..."
                 placeholderTextColor={Colors.text.muted}
                 autoFocus
+                returnKeyType="done"
+                onSubmitEditing={handleAddTopic}
               />
               <TouchableOpacity style={styles.addBtn} onPress={handleAddTopic} disabled={loading}>
                 {loading
@@ -349,272 +359,308 @@ export function GenerateModal({
           )}
         </>
       )}
+
+      {showTopic && !selectedSubjectId && (
+        <Text style={styles.hintText}>Select a subject to see its topics.</Text>
+      )}
     </>
   )
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.kvWrap}
-      >
-        <Pressable style={styles.backdrop} onPress={handleClose}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.handle} />
+      {/*
+        NO KeyboardAvoidingView anywhere.
 
-            <View style={styles.header}>
-              <Text style={styles.title}>Generate Notes</Text>
-              <TouchableOpacity onPress={handleClose} hitSlop={12}>
-                <Ionicons name="close" size={22} color={Colors.text.muted} />
-              </TouchableOpacity>
-            </View>
+        The sheet sits at the bottom via justifyContent:'flex-end'.
+        The ScrollView inside uses:
+          - automaticallyAdjustKeyboardInsets (iOS 15+): lets the system
+            inset the scroll content exactly by the keyboard height.
+          - keyboardDismissMode="on-drag": swipe down to dismiss keyboard.
+          - keyboardShouldPersistTaps="always": taps on chips work while
+            keyboard is open.
 
-            <View style={styles.tabs}>
-              <TouchableOpacity
-                style={[styles.tab, tab === 'video' && styles.tabActive]}
-                onPress={() => handleTabChange('video')}
-              >
-                <Ionicons name="play-circle-outline" size={15} color={tab === 'video' ? Colors.blue.default : Colors.text.muted} />
-                <Text style={[styles.tabText, tab === 'video' && styles.tabTextActive]}>Video</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, tab === 'playlist' && styles.tabActive]}
-                onPress={() => handleTabChange('playlist')}
-              >
-                <Ionicons name="list-outline" size={15} color={tab === 'playlist' ? Colors.blue.default : Colors.text.muted} />
-                <Text style={[styles.tabText, tab === 'playlist' && styles.tabTextActive]}>Playlist</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, tab === 'pdf' && styles.tabActive]}
-                onPress={() => handleTabChange('pdf')}
-              >
-                <Ionicons name="document-text-outline" size={15} color={tab === 'pdf' ? Colors.blue.default : Colors.text.muted} />
-                <Text style={[styles.tabText, tab === 'pdf' && styles.tabTextActive]}>PDF</Text>
-              </TouchableOpacity>
-            </View>
+        The sheet height never changes when keyboard appears — only the
+        scrollable area's bottom inset grows, so the content stays
+        reachable by scrolling. The modal doesn't shrink or jump.
+      */}
+      <View style={styles.root}>
+        <Pressable style={styles.backdrop} onPress={handleClose} />
 
-            <View style={styles.tabContent}>
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
-                keyboardShouldPersistTaps="handled"
-                nestedScrollEnabled={true}
-              >
-                {tab === 'video' && (
-                  <>
-                    <Text style={styles.label}>YouTube URL</Text>
-                    <View style={styles.inputRow}>
-                      <Ionicons name="logo-youtube" size={18} color={Colors.red.default} />
-                      <TextInput
-                        style={styles.input}
-                        value={url}
-                        onChangeText={v => { setUrl(v); setValidationMsg('') }}
-                        placeholder="Paste a YouTube link..."
-                        placeholderTextColor={Colors.text.muted}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                      {url.length > 0 && (
-                        <TouchableOpacity onPress={() => setUrl('')} hitSlop={8}>
-                          <Ionicons name="close-circle" size={16} color={Colors.text.muted} />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                    {subjectTopicSection(true)}
-                  </>
-                )}
+        <View style={styles.sheet}>
+          <View style={styles.handle} />
 
-                {tab === 'playlist' && (
-                  <>
-                    <Text style={styles.label}>Playlist URL</Text>
-                    <View style={styles.inputRow}>
-                      <Ionicons name="logo-youtube" size={18} color={Colors.red.default} />
-                      <TextInput
-                        style={styles.input}
-                        value={playlistUrl}
-                        onChangeText={v => { setPlaylistUrl(v); setPlaylistError('') }}
-                        placeholder="Paste a YouTube playlist link..."
-                        placeholderTextColor={Colors.text.muted}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                      {playlistUrl.length > 0 && (
-                        <TouchableOpacity
-                          onPress={() => { setPlaylistUrl(''); setPlaylistVideos([]); setPlaylistError('') }}
-                          hitSlop={8}
-                        >
-                          <Ionicons name="close-circle" size={16} color={Colors.text.muted} />
-                        </TouchableOpacity>
-                      )}
-                    </View>
+          <View style={styles.header}>
+            <Text style={styles.title}>Generate Notes</Text>
+            <TouchableOpacity onPress={handleClose} hitSlop={12}>
+              <Ionicons name="close" size={22} color={Colors.text.muted} />
+            </TouchableOpacity>
+          </View>
 
-                    <TouchableOpacity
-                      style={[styles.previewBtn, playlistLoading && { opacity: 0.6 }]}
-                      onPress={handleFetchPlaylist}
-                      disabled={playlistLoading}
-                      activeOpacity={0.8}
-                    >
-                      {playlistLoading
-                        ? <ActivityIndicator size="small" color={Colors.blue.default} />
-                        : <Ionicons name="search-outline" size={16} color={Colors.blue.default} />
-                      }
-                      <Text style={styles.previewBtnText}>
-                        {playlistLoading ? 'Fetching...' : 'Preview Playlist'}
-                      </Text>
+          <View style={styles.tabs}>
+            <TouchableOpacity
+              style={[styles.tab, tab === 'video' && styles.tabActive]}
+              onPress={() => handleTabChange('video')}
+            >
+              <Ionicons name="play-circle-outline" size={15} color={tab === 'video' ? Colors.blue.default : Colors.text.muted} />
+              <Text style={[styles.tabText, tab === 'video' && styles.tabTextActive]}>Video</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, tab === 'playlist' && styles.tabActive]}
+              onPress={() => handleTabChange('playlist')}
+            >
+              <Ionicons name="list-outline" size={15} color={tab === 'playlist' ? Colors.blue.default : Colors.text.muted} />
+              <Text style={[styles.tabText, tab === 'playlist' && styles.tabTextActive]}>Playlist</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, tab === 'pdf' && styles.tabActive]}
+              onPress={() => handleTabChange('pdf')}
+            >
+              <Ionicons name="document-text-outline" size={15} color={tab === 'pdf' ? Colors.blue.default : Colors.text.muted} />
+              <Text style={[styles.tabText, tab === 'pdf' && styles.tabTextActive]}>PDF</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            ref={scrollViewRef}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[
+              styles.scrollContent,
+              // Bottom padding so content clears the home indicator
+              { paddingBottom: insets.bottom + Spacing['2xl'] },
+            ]}
+            keyboardDismissMode="on-drag"
+            keyboardShouldPersistTaps="always"
+            // iOS 15+: system adjusts scroll insets by exact keyboard height.
+            // No resize, no jump — the sheet stays put and content scrolls up.
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+            nestedScrollEnabled={true}
+          >
+            {tab === 'video' && (
+              <>
+                <Text style={styles.label}>YouTube URL</Text>
+                <View style={styles.inputRow}>
+                  <Ionicons name="logo-youtube" size={18} color={Colors.red.default} />
+                  <TextInput
+                    style={styles.input}
+                    value={url}
+                    onChangeText={v => { setUrl(v); setValidationMsg('') }}
+                    placeholder="Paste a YouTube link..."
+                    placeholderTextColor={Colors.text.muted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                  />
+                  {url.length > 0 && (
+                    <TouchableOpacity onPress={() => setUrl('')} hitSlop={8}>
+                      <Ionicons name="close-circle" size={16} color={Colors.text.muted} />
                     </TouchableOpacity>
+                  )}
+                </View>
+                {subjectTopicSection(true)}
+              </>
+            )}
 
-                    {playlistError.length > 0 && (
-                      <View style={styles.validationRow}>
-                        <Ionicons name="alert-circle-outline" size={15} color={Colors.red.default} />
-                        <Text style={styles.validationText}>{playlistError}</Text>
-                      </View>
-                    )}
-
-                    {playlistVideos.length > 0 && (
-                      <>
-                        {playlistCapped && (
-                          <View style={styles.capNotice}>
-                            <Ionicons name="information-circle-outline" size={15} color={Colors.warning} />
-                            <Text style={styles.capText}>Processing first 10 of {playlistTotal} videos</Text>
-                          </View>
-                        )}
-                        <Text style={styles.label}>Videos — tap to rename</Text>
-                        {playlistVideos.map((v, i) => (
-                          <View key={v.video_id} style={styles.videoRow}>
-                            <View style={styles.videoIndex}>
-                              <Text style={styles.videoIndexText}>{i + 1}</Text>
-                            </View>
-                            <TextInput
-                              style={styles.videoTitle}
-                              value={editedTitles[v.video_id] ?? v.title}
-                              onChangeText={text => setEditedTitles(prev => ({ ...prev, [v.video_id]: text }))}
-                              placeholderTextColor={Colors.text.muted}
-                            />
-                          </View>
-                        ))}
-                      </>
-                    )}
-
-                    {subjectTopicSection(false)}
-
-                    <View style={styles.playlistHint}>
-                      <Ionicons name="information-circle-outline" size={14} color={Colors.text.muted} />
-                      <Text style={styles.playlistHintText}>
-                        Each video becomes its own topic under the selected subject.
-                      </Text>
-                    </View>
-                  </>
-                )}
-
-                {tab === 'pdf' && (
-                  <>
-                    <Text style={styles.label}>PDF File</Text>
+            {tab === 'playlist' && (
+              <>
+                <Text style={styles.label}>Playlist URL</Text>
+                <View style={styles.inputRow}>
+                  <Ionicons name="logo-youtube" size={18} color={Colors.red.default} />
+                  <TextInput
+                    style={styles.input}
+                    value={playlistUrl}
+                    onChangeText={v => { setPlaylistUrl(v); setPlaylistError('') }}
+                    placeholder="Paste a YouTube playlist link..."
+                    placeholderTextColor={Colors.text.muted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    blurOnSubmit={true}
+                  />
+                  {playlistUrl.length > 0 && (
                     <TouchableOpacity
-                      style={styles.pdfPickBtn}
-                      onPress={handlePickPdf}
-                      activeOpacity={0.8}
+                      onPress={() => { setPlaylistUrl(''); setPlaylistVideos([]); setPlaylistError('') }}
+                      hitSlop={8}
                     >
-                      <Ionicons
-                        name={pdfFile ? 'document-text' : 'document-text-outline'}
-                        size={20}
-                        color={pdfFile ? Colors.success : Colors.text.muted}
-                      />
-                      <Text style={[styles.pdfPickText, pdfFile && styles.pdfPickTextActive]} numberOfLines={1}>
-                        {pdfFile ? pdfFile.name : 'Tap to pick a PDF...'}
-                      </Text>
-                      {pdfFile && (
-                        <TouchableOpacity onPress={() => setPdfFile(null)} hitSlop={8}>
-                          <Ionicons name="close-circle" size={16} color={Colors.text.muted} />
-                        </TouchableOpacity>
-                      )}
+                      <Ionicons name="close-circle" size={16} color={Colors.text.muted} />
                     </TouchableOpacity>
-
-                    {extractStatus === 'error' && extractError && (
-                      <View style={styles.validationRow}>
-                        <Ionicons name="alert-circle-outline" size={15} color={Colors.red.default} />
-                        <Text style={styles.validationText}>{extractError}</Text>
-                      </View>
-                    )}
-
-                    {subjectTopicSection(true)}
-                  </>
-                )}
-
-                {validationMsg.length > 0 && (
-                  <View style={styles.validationRow}>
-                    <Ionicons name="alert-circle-outline" size={15} color={Colors.red.default} />
-                    <Text style={styles.validationText}>{validationMsg}</Text>
-                  </View>
-                )}
-
-                {isGuestLimitReached && (
-                  <View style={styles.guestLimitRow}>
-                    <Ionicons name="lock-closed-outline" size={15} color={Colors.red.default} />
-                    <Text style={[styles.validationText, { flex: 1 }]}>
-                      You've used your 3 free notes.{' '}
-                      <Text
-                        style={{ color: Colors.blue.default, textDecorationLine: 'underline' }}
-                        onPress={() => { handleClose(); router.push('/auth/login') }}
-                      >
-                        Sign up to continue
-                      </Text>
-                    </Text>
-                  </View>
-                )}
+                  )}
+                </View>
 
                 <TouchableOpacity
-                  style={[styles.generateBtn, (isGuestLimitReached || isGenerating) && { opacity: 0.5 }]}
-                  onPressIn={() => {
-                    if (tab === 'video') handleGenerate()
-                    else if (tab === 'playlist') handleGeneratePlaylist()
-                    else handleGeneratePdf()
-                  }}
-                  disabled={isGuestLimitReached || isGenerating}
+                  style={[styles.previewBtn, playlistLoading && { opacity: 0.6 }]}
+                  onPress={handleFetchPlaylist}
+                  disabled={playlistLoading}
                   activeOpacity={0.8}
                 >
-                  {isGenerating
-                    ? <ActivityIndicator size="small" color="#fff" />
-                    : <Ionicons name="sparkles" size={18} color="#fff" />
+                  {playlistLoading
+                    ? <ActivityIndicator size="small" color={Colors.blue.default} />
+                    : <Ionicons name="search-outline" size={16} color={Colors.blue.default} />
                   }
-                  <Text style={styles.generateText}>
-                    {isGenerating
-                      ? tab === 'pdf' ? 'Extracting...' : 'Preparing...'
-                      : tab === 'playlist' && playlistVideos.length > 0
-                        ? `Generate ${playlistVideos.length} Notes`
-                        : 'Generate Notes'
-                    }
+                  <Text style={styles.previewBtnText}>
+                    {playlistLoading ? 'Fetching...' : 'Preview Playlist'}
                   </Text>
                 </TouchableOpacity>
 
-              </ScrollView>
-            </View>
+                {playlistError.length > 0 && (
+                  <View style={styles.validationRow}>
+                    <Ionicons name="alert-circle-outline" size={15} color={Colors.red.default} />
+                    <Text style={styles.validationText}>{playlistError}</Text>
+                  </View>
+                )}
 
-          </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
+                {playlistVideos.length > 0 && (
+                  <>
+                    {playlistCapped && (
+                      <View style={styles.capNotice}>
+                        <Ionicons name="information-circle-outline" size={15} color={Colors.warning} />
+                        <Text style={styles.capText}>Processing first 10 of {playlistTotal} videos</Text>
+                      </View>
+                    )}
+                    <Text style={styles.label}>Videos — tap to rename</Text>
+                    {playlistVideos.map((v, i) => (
+                      <View key={v.video_id} style={styles.videoRow}>
+                        <View style={styles.videoIndex}>
+                          <Text style={styles.videoIndexText}>{i + 1}</Text>
+                        </View>
+                        <TextInput
+                          style={styles.videoTitle}
+                          value={editedTitles[v.video_id] ?? v.title}
+                          onChangeText={text => setEditedTitles(prev => ({ ...prev, [v.video_id]: text }))}
+                          placeholderTextColor={Colors.text.muted}
+                        />
+                      </View>
+                    ))}
+                  </>
+                )}
+
+                {subjectTopicSection(false)}
+
+                <View style={styles.playlistHint}>
+                  <Ionicons name="information-circle-outline" size={14} color={Colors.text.muted} />
+                  <Text style={styles.playlistHintText}>
+                    Each video becomes its own topic under the selected subject.
+                  </Text>
+                </View>
+              </>
+            )}
+
+            {tab === 'pdf' && (
+              <>
+                <Text style={styles.label}>PDF File</Text>
+                <TouchableOpacity
+                  style={styles.pdfPickBtn}
+                  onPress={handlePickPdf}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={pdfFile ? 'document-text' : 'document-text-outline'}
+                    size={20}
+                    color={pdfFile ? Colors.success : Colors.text.muted}
+                  />
+                  <Text style={[styles.pdfPickText, pdfFile && styles.pdfPickTextActive]} numberOfLines={1}>
+                    {pdfFile ? pdfFile.name : 'Tap to pick a PDF...'}
+                  </Text>
+                  {pdfFile && (
+                    <TouchableOpacity onPress={() => setPdfFile(null)} hitSlop={8}>
+                      <Ionicons name="close-circle" size={16} color={Colors.text.muted} />
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+
+                {extractStatus === 'error' && extractError && (
+                  <View style={styles.validationRow}>
+                    <Ionicons name="alert-circle-outline" size={15} color={Colors.red.default} />
+                    <Text style={styles.validationText}>{extractError}</Text>
+                  </View>
+                )}
+
+                {subjectTopicSection(true)}
+              </>
+            )}
+
+            {validationMsg.length > 0 && (
+              <View style={styles.validationRow}>
+                <Ionicons name="alert-circle-outline" size={15} color={Colors.red.default} />
+                <Text style={styles.validationText}>{validationMsg}</Text>
+              </View>
+            )}
+
+            {isGuestLimitReached && (
+              <View style={styles.guestLimitRow}>
+                <Ionicons name="lock-closed-outline" size={15} color={Colors.red.default} />
+                <Text style={[styles.validationText, { flex: 1 }]}>
+                  You've used your 3 free notes.{' '}
+                  <Text
+                    style={{ color: Colors.blue.default, textDecorationLine: 'underline' }}
+                    onPress={() => { handleClose(); router.push('/auth/login') }}
+                  >
+                    Sign up to continue
+                  </Text>
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.generateBtn, (isGuestLimitReached || isCurrentTabGenerating) && { opacity: 0.5 }]}
+              onPress={() => {
+                if (tab === 'video') handleGenerate()
+                else if (tab === 'playlist') handleGeneratePlaylist()
+                else handleGeneratePdf()
+              }}
+              disabled={isGuestLimitReached || isCurrentTabGenerating}
+              activeOpacity={0.8}
+            >
+              {isCurrentTabGenerating
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Ionicons name="sparkles" size={18} color="#fff" />
+              }
+              <Text style={styles.generateText}>
+                {isCurrentTabGenerating
+                  ? tab === 'pdf' ? 'Extracting...' : 'Preparing...'
+                  : tab === 'playlist' && playlistVideos.length > 0
+                    ? `Generate ${playlistVideos.length} Notes`
+                    : 'Generate Notes'
+                }
+              </Text>
+            </TouchableOpacity>
+
+          </ScrollView>
+        </View>
+      </View>
     </Modal>
   )
 }
 
 const styles = StyleSheet.create({
-  kvWrap: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  // Full-screen container, sheet floats at the bottom.
+  // No KAV here — the sheet height must not change when keyboard appears.
+  root: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  // Backdrop is a sibling of the sheet (not a wrapper) so its onPress
+  // closes the modal without interfering with touches inside the sheet.
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
   sheet: {
     backgroundColor: Colors.surface,
     borderTopLeftRadius: Layout.borderRadius.xl,
     borderTopRightRadius: Layout.borderRadius.xl,
     paddingTop: Spacing.lg,
     paddingHorizontal: Spacing.lg,
-    paddingBottom: 0,
     borderWidth: 1,
     borderBottomWidth: 0,
     borderColor: Colors.border,
-    minHeight: '60%',
+    // Natural height: grows with content up to 90% of screen.
+    // Does NOT flex:1 — that would force it to full height always.
     maxHeight: '90%',
-    flexDirection: 'column',
   },
-  tabContent: { flex: 1 },
-  scrollContent: { paddingBottom: Spacing['2xl'] },
+  scrollContent: {
+    // Top padding only; bottom is set dynamically with insets.bottom
+  },
   handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: Spacing.md },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   title: { fontSize: Typography.size.lg, fontFamily: Typography.family.bold, color: Colors.text.primary },
@@ -644,6 +690,12 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     marginBottom: Spacing.sm,
     marginTop: Spacing.xs,
+  },
+  hintText: {
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.family.regular,
+    color: Colors.text.muted,
+    marginBottom: Spacing.sm,
   },
   inputRow: {
     flexDirection: 'row',

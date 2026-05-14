@@ -209,7 +209,7 @@ export default function NotesScreen() {
       )}
 
       <TouchableOpacity
-        style={[styles.fab, { bottom: 100 + insets.bottom }]}
+        style={[styles.fab, { bottom: 100 + insets.bottom }, generateVisible && { display: 'none' }]}
         onPress={() => setGenerateVisible(true)}
         activeOpacity={0.85}
       >
