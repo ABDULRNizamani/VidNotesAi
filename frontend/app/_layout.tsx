@@ -5,6 +5,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAuth } from '@/hooks/useAuth';
+import { SubjectsTopicsProvider } from '@/context/SubjectsTopicsContext';
 import { Colors } from '@/constants/colors';
 import { PostHogProvider, usePostHog } from 'posthog-react-native';
 import { useEffect } from 'react';
@@ -66,7 +67,9 @@ export default function RootLayout() {
       apiKey={process.env.EXPO_PUBLIC_POSTHOG_KEY!}
       options={{ host: 'https://us.i.posthog.com' }}
     >
-      <RootLayoutInner />
+      <SubjectsTopicsProvider>
+        <RootLayoutInner />
+      </SubjectsTopicsProvider>
     </PostHogProvider>
   );
 }

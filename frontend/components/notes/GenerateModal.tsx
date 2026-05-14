@@ -5,8 +5,7 @@ import {
 import { useState, useEffect, useRef } from 'react'
 import { Ionicons } from '@expo/vector-icons'
 import * as DocumentPicker from 'expo-document-picker'
-import { useSubjects } from '@/hooks/useSubjects'
-import { useTopics } from '@/hooks/useTopics'
+import { useSubjectsTopicsStore } from '@/context/SubjectsTopicsContext'
 import { useAuth } from '@/hooks/useAuth'
 import { useNotes } from '@/hooks/useNotes'
 import { usePdf } from '@/hooks/usePdf'
@@ -47,7 +46,8 @@ export function GenerateModal({
   const [tab, setTab] = useState<Tab>('video')
   const insets = useSafeAreaInsets()
 
-  const { subjects, createSubject } = useSubjects()
+  const { state, createSubject, fetchTopics, createTopic } = useSubjectsTopicsStore()
+  const subjects = state.subjects
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null)
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null)
   const [newSubjectName, setNewSubjectName] = useState('')
@@ -57,7 +57,15 @@ export function GenerateModal({
   const [loading, setLoading] = useState(false)
   const [validationMsg, setValidationMsg] = useState('')
 
-  const { topics, createTopic } = useTopics(selectedSubjectId ?? '')
+  const topics = state.topicsBySubject[selectedSubjectId ?? ''] ?? []
+
+  // Fetch topics for the selected subject if not yet loaded
+  useEffect(() => {
+    if (selectedSubjectId && !state.topicsBySubject[selectedSubjectId]) {
+      fetchTopics(selectedSubjectId)
+    }
+  }, [selectedSubjectId])
+
   const { isGuestLimitReached } = useNotes(selectedTopicId ?? 'none')
 
   const [url, setUrl] = useState(prefillUrl)
@@ -160,7 +168,7 @@ export function GenerateModal({
     }
     setLoading(true)
     try {
-      const t = await createTopic(trimmed)
+      const t = await createTopic(selectedSubjectId, trimmed)
       setSelectedTopicId(t.id)
       setNewTopicName('')
       setAddingTopic(false)
@@ -209,7 +217,7 @@ export function GenerateModal({
       const videosWithTopics: { video_id: string; title: string; topic_id: string }[] = []
       for (const video of playlistVideos) {
         const topicName = editedTitles[video.video_id] || video.title
-        const topic = await createTopic(topicName, undefined, 'pending')
+        const topic = await createTopic(selectedSubjectId, topicName, undefined, 'pending')
         if (!topic?.id) throw new Error('Failed to create topic: ' + topicName)
         videosWithTopics.push({ video_id: video.video_id, title: topicName, topic_id: topic.id })
       }
