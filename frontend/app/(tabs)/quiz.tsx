@@ -19,7 +19,7 @@ import { Layout } from '@/constants/layout'
 
 type Difficulty = 'easy' | 'medium' | 'hard'
 
-// ── Topic picker ──────────────────────────────────────────────────────────────
+// ── Topic picker 
 
 function TopicPickerModal({
   visible,
@@ -175,7 +175,7 @@ function TopicPickerModal({
   )
 }
 
-// ── Results screen ────────────────────────────────────────────────────────────
+// ── Results screen 
 
 function ResultsScreen({
   score,
@@ -210,7 +210,7 @@ function ResultsScreen({
   )
 }
 
-// ── Main screen ───────────────────────────────────────────────────────────────
+// ── Main screen 
 
 export default function QuizScreen() {
   const insets = useSafeAreaInsets()

@@ -4,7 +4,7 @@ import {
 } from 'react-native'
 import { useState, useEffect, useRef } from 'react'
 import { Ionicons } from '@expo/vector-icons'
-import { useTopics, Topic } from '@/hooks/useTopics'
+import { useSubjectsTopicsStore, Topic } from '@/context/SubjectsTopicsContext'
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal'
 import { Subject } from '@/hooks/useSubjects'
 import { Colors } from '@/constants/colors'
@@ -35,7 +35,17 @@ export function SubjectAccordion({
 }: Props) {
   const [expanded, setExpanded] = useState(forceExpanded)
   const [deleteSubjectVisible, setDeleteSubjectVisible] = useState(false)
-  const { topics: fetchedTopics, loading } = useTopics(subject.id)
+  const { state, fetchTopics } = useSubjectsTopicsStore()
+
+  const fetchedTopics = state.topicsBySubject[subject.id] ?? []
+  const loading = state.topicsLoading[subject.id] ?? false
+
+  // Fetch on first render if not yet in store
+  useEffect(() => {
+    if (!state.topicsBySubject[subject.id]) {
+      fetchTopics(subject.id)
+    }
+  }, [subject.id])
 
   const topics = overrideTopics ?? fetchedTopics
 

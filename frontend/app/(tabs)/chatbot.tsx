@@ -35,7 +35,7 @@ interface ActiveSession {
   messages: ChatMessage[]
 }
 
-// ── Note picker modal ─────────────────────────────────────────────────────────
+// ── Note picker modal 
 
 function NotePickerModal({
   visible, notes, selectedIds, onToggle, onConfirm, onClose, loading,
@@ -127,7 +127,7 @@ function NotePickerModal({
   )
 }
 
-// ── Sessions sidebar ──────────────────────────────────────────────────────────
+// ── Sessions sidebar 
 
 function SessionsSidebar({
   visible, sessions, activeSessionId, onSelect, onNew, onClose, loading,
@@ -187,7 +187,7 @@ function SessionsSidebar({
   )
 }
 
-// ── Main screen ───────────────────────────────────────────────────────────────
+// ── Main screen 
 
 export default function ChatbotScreen() {
   const insets = useSafeAreaInsets()
@@ -212,10 +212,7 @@ export default function ChatbotScreen() {
 
   // fake streaming — holds the latest full assistant reply
   const [latestReply, setLatestReply] = useState<string | null>(null)
-  const { displayed: streamedReply, done: streamDone } = useFakeStream(latestReply, {
-    charsPerTick: 8,
-    intervalMs: 16,
-  })
+  const { displayed: streamedReply, done: streamDone } = useFakeStream(latestReply)
 
   const loadSessions = useCallback(async () => {
     if (isGuest || !user) return
@@ -360,7 +357,7 @@ export default function ChatbotScreen() {
     }
   }, [input, activeSession, sending, loadSessions])
 
-  // ── Guest wall ──────────────────────────────────────────────────────────────
+  // ── Guest wall 
 
   if (isGuest) {
     return (
@@ -388,7 +385,7 @@ export default function ChatbotScreen() {
     )
   }
 
-  // ── Empty state ─────────────────────────────────────────────────────────────
+  // ── Empty state 
 
   const renderEmptyState = () => (
     <View style={styles.emptyBody}>
@@ -423,7 +420,7 @@ export default function ChatbotScreen() {
     </View>
   )
 
-  // ── Main render ─────────────────────────────────────────────────────────────
+  // ── Main render 
 
   // last message index for fake streaming
   const messages = activeSession?.messages ?? []

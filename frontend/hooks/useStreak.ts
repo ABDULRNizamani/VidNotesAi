@@ -34,7 +34,7 @@ function isMilestone(n: number) {
   return n > 0 && n % 10 === 0
 }
 
-// ── AsyncStorage helpers (guest) ──────────────────────────────────────────────
+// ── AsyncStorage helpers (guest)
 
 async function loadGuestStreak(): Promise<StreakState> {
   const [current, highest, lastDate, collectedFlag] = await Promise.all([
@@ -82,7 +82,7 @@ async function collectGuestStreak(): Promise<StreakState> {
   return { current, highest, collectedToday: true, isMilestone: isMilestone(current) }
 }
 
-// ── Supabase helpers (authenticated) ─────────────────────────────────────────
+// ── Supabase helpers (authenticated) 
 
 async function loadSupabaseStreak(userId: string): Promise<StreakState> {
   const today = todayISO()
@@ -145,7 +145,7 @@ export async function collectSupabaseStreak(userId: string): Promise<StreakState
   return { current, highest, collectedToday: true, isMilestone: isMilestone(current) }
 }
 
-// ── Migration: AsyncStorage → Supabase on login ───────────────────────────────
+// ── Migration: AsyncStorage → Supabase on login 
 
 export async function migrateStreakToSupabase(userId: string) {
   const [current, highest, lastDate] = await Promise.all([
@@ -177,7 +177,7 @@ export async function migrateStreakToSupabase(userId: string) {
   await AsyncStorage.multiRemove(Object.values(AS_KEYS))
 }
 
-// ── Hook ──────────────────────────────────────────────────────────────────────
+// ── Hook 
 
 export function useStreak() {
   const { user, isGuest } = useAuth()

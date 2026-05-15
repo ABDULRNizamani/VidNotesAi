@@ -75,7 +75,7 @@ const RETRY_DELAY_REGEX = /try again in (\d+)/i;
 export function parseApiError(error: unknown): ApiError {
   const raw = error instanceof Error ? error.message : String(error);
 
-  // ── Network ───────────────────────────────────────────────────────────────
+  // ── Network 
   if (
     raw.includes('Network request failed') ||
     raw.includes('Failed to fetch') ||
@@ -85,12 +85,12 @@ export function parseApiError(error: unknown): ApiError {
     return make(ApiErrorType.NETWORK_ERROR, 'No internet connection. Please check your network and try again.', raw, true, false);
   }
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
+  // ── Auth
    if (raw.includes('Unauthorized')) {
      return make(ApiErrorType.AUTH_EXPIRED, 'Your session expired. Please sign in again.', raw, false, true);
     }
 
-  // ── Rate limits ───────────────────────────────────────────────────────────
+  // ── Rate limits
   if (raw.includes('AI requests per') || raw.includes('Too many requests')) {
     const match = raw.match(RETRY_DELAY_REGEX);
     const suffix = match ? ` Try again in ${match[1]}s.` : ' Please slow down.';
@@ -112,7 +112,7 @@ export function parseApiError(error: unknown): ApiError {
     return make(ApiErrorType.RATE_LIMIT_PDF_IMPORT_DAILY, 'Daily PDF import limit reached. Try again tomorrow.', raw, false, false);
   }
 
-  // ── Guest ─────────────────────────────────────────────────────────────────
+  // ── Guest 
   if (raw === 'guest_limit_reached' || raw.includes('guest_limit_reached')) {
     return make(ApiErrorType.GUEST_LIMIT, "You've reached the free limit. Sign up to generate more notes.", raw, false, true);
   }
@@ -121,7 +121,7 @@ export function parseApiError(error: unknown): ApiError {
     return make(ApiErrorType.GUEST_PDF_LIMIT, "You've used your free PDF import. Sign up to import more.", raw, false, true);
   }
 
-  // ── Ownership / access ────────────────────────────────────────────────────
+  // ── Ownership / access 
   if (
     raw.includes("don't own that topic") ||
     raw.includes("don't own that note") ||
@@ -130,7 +130,7 @@ export function parseApiError(error: unknown): ApiError {
     return make(ApiErrorType.ACCESS_DENIED, 'Something went wrong. Please try again.', raw, false, false);
   }
 
-  // ── Validation ────────────────────────────────────────────────────────────
+  // ── Validation 
   if (raw.includes('Max 7 notes')) {
     return make(ApiErrorType.TOPIC_FULL, 'This topic is full. Delete a note to make space.', raw, false, true);
   }
@@ -159,7 +159,7 @@ export function parseApiError(error: unknown): ApiError {
     return make(ApiErrorType.SESSION_NOT_FOUND, 'Chat session expired. Starting a new one.', raw, false, true);
   }
 
-  // ── Content errors ────────────────────────────────────────────────────────
+  // ── Content errors
   if (raw.includes('Transcripts are disabled')) {
     return make(ApiErrorType.TRANSCRIPTS_DISABLED, 'Transcripts are disabled for this video. Try a different one.', raw, false, false);
   }
@@ -170,7 +170,7 @@ export function parseApiError(error: unknown): ApiError {
     return make(ApiErrorType.PDF_SCANNED, 'This PDF appears to be scanned. Text extraction failed.', raw, false, false);
   }
 
-  // ── AI / server ───────────────────────────────────────────────────────────
+  // ── AI / server
   if (raw.includes('AI service is temporarily unavailable') || raw.includes('AI is busy')) {
     return make(ApiErrorType.AI_UNAVAILABLE, 'AI is busy right now. Please try again in a few minutes.', raw, true, true);
   }
@@ -178,7 +178,7 @@ export function parseApiError(error: unknown): ApiError {
     return make(ApiErrorType.SERVER_ERROR, 'Something went wrong. Please try again.', raw, true, false);
   }
 
-  // ── Unknown ───────────────────────────────────────────────────────────────
+  // ── Unknown 
   return make(ApiErrorType.UNKNOWN, 'Something went wrong. Please try again.', raw, true, false);
 }
 

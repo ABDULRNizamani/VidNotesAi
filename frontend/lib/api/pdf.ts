@@ -11,6 +11,7 @@ export const exportNotesPdf = (noteIds: string[], topicId?: string) =>
   apiPostBlob('/api/pdf/notes', { note_ids: noteIds, topic_id: topicId });
 
 // React Native-compatible: use fileUri + base64 directly instead of blob
+
 export async function extractPdfText(fileUri: string, base64: string): Promise<PdfExtractResponse> {
   const headers = await getAuthHeader();
   const form = new FormData();

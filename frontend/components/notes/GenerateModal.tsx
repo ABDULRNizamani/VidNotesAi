@@ -59,11 +59,9 @@ export function GenerateModal({
 
   const topics = state.topicsBySubject[selectedSubjectId ?? ''] ?? []
 
-  // Fetch topics for the selected subject if not yet loaded
+  // Always re-fetch when subject changes — don't rely on cache
   useEffect(() => {
-    if (selectedSubjectId && !state.topicsBySubject[selectedSubjectId]) {
-      fetchTopics(selectedSubjectId)
-    }
+    if (selectedSubjectId) fetchTopics(selectedSubjectId)
   }, [selectedSubjectId])
 
   const { isGuestLimitReached } = useNotes(selectedTopicId ?? 'none')

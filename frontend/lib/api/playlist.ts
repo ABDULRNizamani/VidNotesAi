@@ -25,6 +25,7 @@ export const getPlaylistInfo = (url: string): Promise<PlaylistInfo> =>
 /**
  * Parse SSE blocks from a text chunk and fire onEvent for each complete event.
  */
+
 function parseSseText(text: string, onEvent: (event: PlaylistEvent) => void) {
   const blocks = text.split('\n\n');
   for (const block of blocks) {
@@ -65,6 +66,7 @@ export const generatePlaylist = async (
   // fetch() on RN buffers the entire SSE response before resolving (res.body
   // is undefined on RN) so all events would fire at once after 80-100 min of
   // silence. XHR is built into RN — no extra dependency needed.
+  
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     let processedLength = 0;

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { generateNotes, generateNotesFromText, getNotes, deleteNote, Note } from '@/lib/api/notes';
 import { getGuestNotes, saveGuestNote, deleteGuestNote } from '@/services/storage';
 import { useAuth } from '@/hooks/useAuth';
+import { useSubjectsTopicsStore } from '@/context/SubjectsTopicsContext';
 import { parseApiError, ApiErrorType, ApiError } from '@/lib/api/errors';
 import * as Crypto from 'expo-crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,8 +10,9 @@ import { supabase } from '@/supabase';
 
 const GUEST_PDF_IMPORT_KEY = 'guest:pdf_import_used';
 
-export function useNotes(topicId: string) {
+export function useNotes(topicId: string, subjectId?: string) {
   const { isGuest, isLoading: authLoading } = useAuth();
+  const { setTopicStatus, fetchTopics } = useSubjectsTopicsStore();
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<ApiError | null>(null);
@@ -39,6 +41,11 @@ export function useNotes(topicId: string) {
     setStreaming(true);
     setStreamedContent('');
     setApiError(null);
+    // Mark topic as generating in the global store so the notes list
+    // shows a loading indicator even if the user navigates back
+    if (subjectId && topicId && topicId !== 'skip') {
+      setTopicStatus(subjectId, topicId, 'generating');
+    }
     try {
       const res = await generateNotes(url, isGuest ? undefined : topicId, title);
       const content = res.content;
@@ -72,8 +79,13 @@ export function useNotes(topicId: string) {
       setApiError(parseApiError(e));
     } finally {
       setStreaming(false);
+      if (subjectId && topicId && topicId !== 'skip') {
+        setTopicStatus(subjectId, topicId, null);
+        // Refresh the store's topic list so SubjectAccordion shows the new note
+        fetchTopics(subjectId);
+      }
     }
-  }, [topicId, isGuest, authLoading, fetchNotes]);
+  }, [topicId, subjectId, isGuest, authLoading, fetchNotes, setTopicStatus, fetchTopics]);
 
   const streamNotesFromText = useCallback(async (sourceText: string, title?: string) => {
     if (authLoading) return;

@@ -52,8 +52,7 @@ export interface Topic {
   generation_status: TopicGenerationStatus;
 }
 
-// ─── State & actions ──────────────────────────────────────────────────────────
-
+// ─── State & actions 
 interface State {
   subjects: Subject[];
   subjectsLoading: boolean;
@@ -169,7 +168,7 @@ const initialState: State = {
   topicsError: {},
 };
 
-// ─── Context ──────────────────────────────────────────────────────────────────
+// ─── Context 
 
 interface ContextValue {
   state: State;
@@ -192,14 +191,14 @@ interface ContextValue {
 
 const SubjectsTopicsContext = createContext<ContextValue | null>(null);
 
-// ─── Provider ─────────────────────────────────────────────────────────────────
+// ─── Provider 
 
 export function SubjectsTopicsProvider({ children }: { children: React.ReactNode }) {
   const { isGuest, isLoading: authLoading, user } = useAuth();
   const [state, dispatch] = useReducer(reducer, initialState);
   const fetchedRef = useRef(false);
 
-  // ── Subjects ────────────────────────────────────────────────────────────────
+  // ── Subjects
 
   const fetchSubjects = useCallback(async () => {
     if (authLoading) return;
@@ -278,7 +277,7 @@ export function SubjectsTopicsProvider({ children }: { children: React.ReactNode
     dispatch({ type: 'SUBJECT_DELETED', payload: subjectId });
   }, [isGuest]);
 
-  // ── Topics ──────────────────────────────────────────────────────────────────
+  // ── Topics 
 
   const fetchTopics = useCallback(async (subjectId: string) => {
     if (authLoading || subjectId === 'skip') return;
@@ -392,7 +391,7 @@ export function SubjectsTopicsProvider({ children }: { children: React.ReactNode
   );
 }
 
-// ─── Hook accessor ────────────────────────────────────────────────────────────
+// ─── Hook accessor 
 
 export function useSubjectsTopicsStore() {
   const ctx = useContext(SubjectsTopicsContext);

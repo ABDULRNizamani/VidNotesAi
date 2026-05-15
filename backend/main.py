@@ -16,6 +16,7 @@ from services.share import router as share_router
 from services.daily_quiz import router as daily_quiz_router
 from services.devices import router as devices_router
 from services.playlist import router as playlist_router
+from services.account import router as account_router
 from services.scheduler import start_scheduler
 import logging
 
@@ -62,6 +63,7 @@ app.include_router(share_router)
 app.include_router(devices_router)
 app.include_router(daily_quiz_router)
 app.include_router(playlist_router)
+app.include_router(account_router)
 
 
 def custom_openapi():

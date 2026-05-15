@@ -5,6 +5,7 @@
  * Tapping "Read it" navigates to /how-it-works.
  * Persists dismiss state with AsyncStorage so it only shows once.
  */
+
 import {
   View,
   Text,

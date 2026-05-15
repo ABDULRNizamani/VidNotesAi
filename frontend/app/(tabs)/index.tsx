@@ -80,7 +80,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Welcome back,</Text>
-            <Text style={styles.name}>{firstName} 👋</Text>
+            <Text style={styles.name}>{firstName}</Text>
           </View>
           <TouchableOpacity
             style={styles.settingsBtn}
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   content: {
-    paddingTop: Spacing.lg,
+    paddingTop: Spacing.xl,
     paddingBottom: 100,
     gap: Spacing.xl,
   },
@@ -155,12 +155,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Layout.screenPadding,
   },
   greeting: {
-    fontSize: Typography.size.sm,
+    fontSize: Typography.size.md,
     color: Colors.text.muted,
     fontFamily: Typography.family.regular,
   },
   name: {
-    fontSize: Typography.size.xl,
+    fontSize: Typography.size['2xl'],
     color: Colors.text.primary,
     fontFamily: Typography.family.bold,
   },

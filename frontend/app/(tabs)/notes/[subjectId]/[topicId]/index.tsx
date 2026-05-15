@@ -76,7 +76,7 @@ export default function TopicScreen() {
     subjectId: string; topicId: string; url?: string; pdfText?: string; pdfPages?: string
   }>()
 
-  const { notes, loading, streaming, streamedContent, streamNotes, removeNote, authLoading, refetch } = useNotes(topicId)
+  const { notes, loading, streaming, streamedContent, streamNotes, removeNote, authLoading, refetch } = useNotes(topicId, subjectId)
   const { extractStatus, extractError, extractText, resetExtract } = usePdf()
 
   const [noteToDelete, setNoteToDelete] = useState<Note | null>(null)
@@ -135,7 +135,7 @@ export default function TopicScreen() {
   }
 
 
-  // ── Streaming view (YouTube) ──────────────────────────────────────────────
+  // ── Streaming view (YouTube) 
   if (streaming) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -163,7 +163,7 @@ export default function TopicScreen() {
     )
   }
 
-  // ── Streaming view (PDF) ──────────────────────────────────────────────────
+  // ── Streaming view (PDF)
   if (pdfStreaming) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -191,7 +191,7 @@ export default function TopicScreen() {
     )
   }
 
-  // ── Notes list ────────────────────────────────────────────────────────────
+  // ── Notes list 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.header}>

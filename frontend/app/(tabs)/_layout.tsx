@@ -11,6 +11,7 @@ export default function TabLayout() {
     if (isLoading) return;
     // guests can browse but if you want to force login, uncomment:
     // if (isGuest) router.replace('/auth/login');
+    
   }, [isGuest, isLoading]);
 
   return (

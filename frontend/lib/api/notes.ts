@@ -16,10 +16,12 @@ export interface GenerateNotesResponse {
 }
 
 // topicId is optional — guests don't have DB topics
+
 export const generateNotes = (url: string, topicId?: string, title?: string) =>
   apiPost<GenerateNotesResponse>('/generate/notes', { url, topic_id: topicId ?? null, title });
 
 // topicId optional — guests don't have DB topics
+
 export const generateNotesFromText = (sourceText: string, topicId?: string, title?: string) =>
   apiPost<GenerateNotesResponse>('/generate/notes/from-text', {
     source_text: sourceText,
@@ -28,6 +30,7 @@ export const generateNotesFromText = (sourceText: string, topicId?: string, titl
   });
 
 // direct Supabase — RLS handles ownership
+
 export const getNotes = async (topicId: string): Promise<Note[]> => {
   const { data, error } = await supabase
     .from('notes')
@@ -41,6 +44,7 @@ export const getNotes = async (topicId: string): Promise<Note[]> => {
 };
 
 // direct Supabase — soft delete, RLS handles ownership
+
 export const deleteNote = async (noteId: string): Promise<void> => {
   const { error } = await supabase
     .from('notes')

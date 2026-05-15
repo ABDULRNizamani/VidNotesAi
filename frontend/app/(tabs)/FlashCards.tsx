@@ -17,7 +17,7 @@ import { Typography } from '@/constants/typography'
 import { Spacing } from '@/constants/spacing'
 import { Layout } from '@/constants/layout'
 
-// ── Topic picker (reuses same pattern as Quiz) ────────────────────────────────
+// ── Topic picker (reuses same pattern as Quiz)
 
 function TopicPickerModal({
   visible,
@@ -134,7 +134,7 @@ function TopicPickerModal({
   )
 }
 
-// ── Finished screen ───────────────────────────────────────────────────────────
+// ── Finished screen
 
 function FinishedScreen({
   total,
@@ -164,7 +164,7 @@ function FinishedScreen({
   )
 }
 
-// ── Main screen ───────────────────────────────────────────────────────────────
+// ── Main screen
 
 export default function FlashcardsScreen() {
   const insets = useSafeAreaInsets()

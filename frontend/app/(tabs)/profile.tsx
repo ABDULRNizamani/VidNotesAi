@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router'
 import { useAuth } from '@/hooks/useAuth'
 import { useStreak } from '@/hooks/useStreak'
 import { supabase } from '@/supabase'
+import { apiDelete } from '@/lib/api/client'
 import { Avatar } from '@/components/shared/Avatar'
 import { LockedFeature } from '@/components/ui/LockedFeature'
 import { Colors } from '@/constants/colors'
@@ -40,6 +41,7 @@ interface WeakTopic {
 
 // Raw shape returned from Supabase quiz_attempts select
 // Supabase PostgREST returns joined rows as arrays even for many-to-one relations
+
 interface RawAttempt {
   score: number
   total: number
@@ -178,14 +180,20 @@ export default function ProfileScreen() {
   const handleDeleteAccount = () => {
     Alert.alert(
       'Delete account',
-      'You will be signed out and your deletion request will be reviewed manually within 48 hours.',
+      'This will permanently delete your account and all your notes, quizzes, and data. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Request deletion',
+          text: 'Delete permanently',
           style: 'destructive',
           onPress: async () => {
-            await logout()
+            try {
+              await apiDelete('/account')
+            } catch (e: any) {
+              console.warn('[profile] delete account error:', e.message)
+            } finally {
+              await logout()
+            }
           },
         },
       ]
